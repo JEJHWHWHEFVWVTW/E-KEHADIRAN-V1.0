@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-KEHADIRAN V1</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Library Imbasan QR Code -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <!-- Library Penjana QR Code -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #printableCard, #printableCard * { visibility: visible; }
+      #printableCard { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen flex flex-col">
+
+  <!-- Header / Navigation -->
+  <header class="bg-emerald-700 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-school text-3xl text-yellow-300"></i>
+        <div>
+          <h1 class="text-2xl font-bold tracking-wide">E-KEHADIRAN V1</h1>
+          <p class="text-xs text-emerald-200">Sistem Pengurusan Kehadiran & Outing Asrama Sekolah</p>
+        </div>
+      </div>
+      <div id="userInfo" class="hidden flex items-center space-x-4 mt-2 sm:mt-0">
+        <span class="text-sm bg-emerald-800 px-3 py-1 rounded-full border border-emerald-600">
+          <i class="fa-solid fa-user-shield mr-1"></i> <span id="userRoleBadge"></span>: <b id="userNameLabel"></b>
+        </span>
+        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded transition shadow">
+          <i class="fa-solid fa-right-from-bracket mr-1"></i> Log Keluar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+
+    <!-- TAB SKRIN LOG MASUK -->
+    <div id="loginScreen" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-md border-t-4 border-emerald-600 mt-10">
+      <div class="text-center mb-6">
+        <i class="fa-solid fa-user-lock text-5xl text-emerald-600 mb-2"></i>
+        <h2 class="text-2xl font-bold text-gray-800">Log Masuk Guru / Warden</h2>
+        <p class="text-xs text-gray-500 mt-1">Sila masukkan No. Kad Pengenalan dan Kata Laluan anda</p>
+      </div>
+      
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">No. Kad Pengenalan / Emel Admin</label>
+          <input type="text" id="loginIc" required placeholder="Contoh: 880101035544 atau syedzharif3@gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Kata Laluan</label>
+          <input type="password" id="loginPassword" required placeholder="******" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-semibold shadow transition">
+          Log Masuk
+        </button>
+      </form>
+    </div>
+
+    <!-- DASHBOARD (Selepas Log Masuk) -->
+    <div id="dashboardScreen" class="hidden space-y-6">
+      
+      <!-- Navigasi Menu Nav -->
+      <div class="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+        <button id="navRecordBtn" onclick="switchTab('recordView')" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold shadow">
+          <i class="fa-solid fa-list-check mr-1"></i> Rekod Kehadiran
+        </button>
+        <button id="navScanBtn" onclick="switchTab('scanView')" class="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-sm font-semibold shadow">
+          <i class="fa-solid fa-qrcode mr-1"></i> Tambah Rekod (Imbas QR)
+        </button>
+        <!-- Panel Admin Button (Hanya dipaparkan jika akaun Admin) -->
+        <button id="navAdminBtn" onclick="switchTab('adminView')" class="hidden px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold shadow">
+          <i class="fa-solid fa-user-gear mr-1"></i> Panel Admin
+        </button>
+      </div>
+
+      <!-- TAB 1: REKOD KEHADIRAN (Boleh Dilihat Oleh Semua Guru/Warden) -->
+      <div id="recordView" class="space-y-6">
+        <div class="bg-white p-4 rounded-xl shadow border border-gray-200 flex flex-wrap justify-between items-center gap-4">
+          <h3 class="text-xl font-bold text-emerald-800"><i class="fa-solid fa-clipboard-user mr-2"></i>Status Kehadiran Pelajar Asrama</h3>
+          <div class="flex gap-2">
+            <select id="filterForm" onchange="renderRecords()" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-emerald-500">
+              <option value="ALL">Semua Tingkatan</option>
+              <option value="1">Tingkatan 1</option>
+              <option value="2">Tingkatan 2</option>
+              <option value="3">Tingkatan 3</option>
+              <option value="4">Tingkatan 4</option>
+              <option value="5">Tingkatan 5</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Senarai Rekod Mengikut Tingkatan -->
+        <div id="recordsContainer" class="space-y-8">
+          <!-- Kandungan diisikan dinamik menerusi JavaScript -->
+        </div>
+      </div>
+
+      <!-- TAB 2: IMBAS QR CODE (Warden) -->
+      <div id="scanView" class="hidden max-w-2xl mx-auto bg-white p-6 rounded-xl shadow border border-gray-200">
+        <h3 class="text-xl font-bold text-gray-800 mb-4 text-center"><i class="fa-solid fa-camera mr-2 text-emerald-600"></i>Imbas QR Code Pelajar</h3>
+        
+        <div id="reader" class="w-full rounded-lg overflow-hidden border border-gray-300"></div>
+
+        <!-- Form Pengesahan Rekod Keluar/Masuk -->
+        <div id="scanResultForm" class="hidden mt-6 p-4 bg-emerald-50 rounded-lg border border-emerald-200 space-y-4">
+          <h4 class="font-bold text-emerald-900 border-b border-emerald-200 pb-2">Maklumat Pelajar Diimbas</h4>
+          <div class="grid grid-cols-2 gap-2 text-sm text-gray-700">
+            <div><b>Nama:</b> <span id="scanNama">-</span></div>
+            <div><b>No. KP:</b> <span id="scanIc">-</span></div>
+            <div><b>Tingkatan:</b> <span id="scanTingkatan">-</span></div>
+            <div><b>Kategori:</b> <span id="scanKategori">-</span></div>
+            <div><b>Dorm/Bilik:</b> <span id="scanDorm">-</span></div>
+          </div>
+
+          <hr class="border-emerald-200">
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sebab Balik / Outing</label>
+            <select id="scanReason" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+              <option value="URUSAN KELUARGA">URUSAN KELUARGA</option>
+              <option value="SAKIT">SAKIT</option>
+              <option value="BALIK BERMALAM">BALIK BERMALAM</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tarikh</label>
+              <input type="text" id="scanDate" readonly class="w-full bg-gray-100 px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Masa</label>
+              <input type="text" id="scanTime" readonly class="w-full bg-gray-100 px-3 py-2 border rounded-lg text-sm">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Warden Bertanggungjawab</label>
+            <input type="text" id="scanWarden" readonly class="w-full bg-gray-100 px-3 py-2 border rounded-lg text-sm font-semibold">
+          </div>
+
+          <button onclick="saveAttendanceRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-bold shadow transition">
+            <i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Rekod
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 3: PANEL ADMIN (Hanya Akaun Admin) -->
+      <div id="adminView" class="hidden space-y-8">
+        
+        <!-- Pendaftaran Guru/Warden & Pelajar -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Tambah Guru/Warden -->
+          <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+            <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fa-solid fa-user-plus text-emerald-600 mr-2"></i> Tambah Guru / Warden Baharu
+            </h4>
+            <form onsubmit="addTeacher(event)" class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-600">Nama Guru/Warden</label>
+                <input type="text" id="tName" required class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-600">No. KP (Sebagai Username)</label>
+                <input type="text" id="tIc" required class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-600">Kata Laluan</label>
+                <input type="password" id="tPass" required class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-semibold">
+                Daftar Guru
+              </button>
+            </form>
+          </div>
+
+          <!-- Tambah Pelajar & Penjana QR Code -->
+          <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+            <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fa-solid fa-id-card text-emerald-600 mr-2"></i> Tambah Pelajar & Cipta QR Code
+            </h4>
+            <form onsubmit="addStudent(event)" class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-600">Nama Pelajar</label>
+                <input type="text" id="sName" required class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600">No. KP Pelajar</label>
+                  <input type="text" id="sIc" required class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600">Tingkatan</label>
+                  <select id="sForm" class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    <option value="1">Tingkatan 1</option>
+                    <option value="2">Tingkatan 2</option>
+                    <option value="3">Tingkatan 3</option>
+                    <option value="4">Tingkatan 4</option>
+                    <option value="5">Tingkatan 5</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600">Kategori Asrama</label>
+                  <select id="sGender" class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    <option value="ASPURA">ASPURA (Lelaki)</option>
+                    <option value="ASPURI">ASPURI (Perempuan)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600">Dorm / Bilik</label>
+                  <input type="text" id="sDorm" placeholder="Contoh: A-1-02" required class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                </div>
+              </div>
+              <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-semibold">
+                Daftar Pelajar & Cipta QR Kad
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+        <!-- Paparan Kad QR Code Pelajar Yang Terhasil -->
+        <div id="cardPreviewSection" class="hidden bg-white p-6 rounded-xl shadow border border-emerald-300">
+          <h4 class="text-md font-bold text-emerald-800 mb-4">Kad QR Code Pelajar Baharu</h4>
+          <div class="flex justify-center">
+            <div id="printableCard" class="bg-gradient-to-r from-emerald-800 to-emerald-600 text-white p-6 rounded-xl w-80 shadow-2xl relative border-2 border-yellow-400">
+              <div class="text-center mb-3">
+                <p class="text-xs font-bold uppercase tracking-widest text-yellow-300">KAD KEHADIRAN ASRAMA</p>
+                <p class="text-lg font-extrabold" id="cardSchoolName">E-KEHADIRAN V1</p>
+              </div>
+              <div class="bg-white p-3 rounded-lg flex justify-center mb-3">
+                <div id="qrcode"></div>
+              </div>
+              <div class="text-xs space-y-1">
+                <p><b>NAMA:</b> <span id="cardName" class="uppercase"></span></p>
+                <p><b>NO. KP:</b> <span id="cardIc"></span></p>
+                <p><b>TINGKATAN:</b> <span id="cardForm"></span> | <b>KATEGORI:</b> <span id="cardGender"></span></p>
+                <p><b>DORM:</b> <span id="cardDorm"></span></p>
+              </div>
+            </div>
+          </div>
+          <div class="text-center mt-4">
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">
+              <i class="fa-solid fa-print mr-1"></i> Cetak Kad Pelajar
+            </button>
+          </div>
+        </div>
+
+        <!-- Senarai Pengurusan Guru & Pelajar (Admin Boleh Hapus) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Senarai Guru -->
+          <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+            <h4 class="text-lg font-bold text-gray-800 mb-3"><i class="fa-solid fa-chalkboard-user mr-2 text-emerald-600"></i>Senarai Guru / Warden</h4>
+            <div class="overflow-y-auto max-h-60">
+              <table class="w-full text-left text-xs text-gray-600">
+                <thead class="bg-gray-100 uppercase text-gray-700 sticky top-0">
+                  <tr>
+                    <th class="p-2">Nama</th>
+                    <th class="p-2">No. KP</th>
+                    <th class="p-2 text-center">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody id="teacherTableBody">
+                  <!-- Diisi dinamik -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Senarai Pelajar (Diasingkan Lelaki/Perempuan) -->
+          <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+            <div class="flex justify-between items-center mb-3">
+              <h4 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users mr-2 text-emerald-600"></i>Senarai Pelajar Asrama</h4>
+              <select id="adminGenderFilter" onchange="renderStudentListAdmin()" class="border text-xs rounded p-1">
+                <option value="ALL">Semua (Aspura & Aspuri)</option>
+                <option value="ASPURA">ASPURA (Lelaki)</option>
+                <option value="ASPURI">ASPURI (Perempuan)</option>
+              </select>
+            </div>
+            <div class="overflow-y-auto max-h-60">
+              <table class="w-full text-left text-xs text-gray-600">
+                <thead class="bg-gray-100 uppercase text-gray-700 sticky top-0">
+                  <tr>
+                    <th class="p-2">Nama</th>
+                    <th class="p-2">Ting.</th>
+                    <th class="p-2">Kat.</th>
+                    <th class="p-2 text-center">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody id="studentTableBody">
+                  <!-- Diisi dinamik -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-gray-400 text-center py-4 text-xs mt-auto">
+    <p>&copy; 2026 E-KEHADIRAN V1 - Hak Cipta Terpelihara. Dicetak Untuk Kegunaan Warden Asrama.</p>
+  </footer>
+
+  <!-- Script Logik Utama -->
+  <script>
+    // Inisialisasi Data Utama
+    const ADMIN_EMAIL = "syedzharif3@gmail.com";
+    
+    // Semak atau tetapkan data dalam LocalStorage
+    let teachers = JSON.parse(localStorage.getItem('teachers')) || [];
+    let students = JSON.parse(localStorage.getItem('students')) || [];
+    let records = JSON.parse(localStorage.getItem('records')) || [];
+
+    let currentUser = null;
+    let html5QrcodeScanner = null;
+    let currentScannedStudent = null;
+
+    // Fungsi Log Masuk
+    function handleLogin(e) {
+      e.preventDefault();
+      const ic = document.getElementById('loginIc').value.trim();
+      const pass = document.getElementById('loginPassword').value.trim();
+
+      // Semakan Akaun Admin
+      if (ic === ADMIN_EMAIL && pass === "admin123") {
+        currentUser = { name: "Admin Utama", role: "ADMIN", ic: ADMIN_EMAIL };
+        initDashboard();
+        return;
+      }
+
+      // Semakan Akaun Guru
+      const foundTeacher = teachers.find(t => t.ic === ic && t.pass === pass);
+      if (foundTeacher) {
+        currentUser = { name: foundTeacher.name, role: "WARDEN", ic: foundTeacher.ic };
+        initDashboard();
+      } else {
+        alert("No. KP / Emel atau Kata Laluan Salah!");
+      }
+    }
+
+    // Paparan Selepas Log Masuk
+    function initDashboard() {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('dashboardScreen').classList.remove('hidden');
+      document.getElementById('userInfo').classList.remove('hidden');
+
+      document.getElementById('userNameLabel').innerText = currentUser.name;
+      document.getElementById('userRoleBadge').innerText = currentUser.role;
+
+      if (currentUser.role === "ADMIN") {
+        document.getElementById('navAdminBtn').classList.remove('hidden');
+      } else {
+        document.getElementById('navAdminBtn').classList.add('hidden');
+      }
+
+      switchTab('recordView');
+    }
+
+    // Tukar Tab Navigasi
+    function switchTab(tabId) {
+      const tabs = ['recordView', 'scanView', 'adminView'];
+      tabs.forEach(t => {
+        document.getElementById(t).classList.add('hidden');
+      });
+      document.getElementById(tabId).classList.remove('hidden');
+
+      // Butang Nav Style
+      document.getElementById('navRecordBtn').className = tabId === 'recordView' ? "px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold shadow" : "px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-sm font-semibold shadow";
+      document.getElementById('navScanBtn').className = tabId === 'scanView' ? "px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold shadow" : "px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-sm font-semibold shadow";
+      if (currentUser.role === "ADMIN") {
+        document.getElementById('navAdminBtn').className = tabId === 'adminView' ? "px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-semibold shadow" : "px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-sm font-semibold shadow";
+      }
+
+      if (tabId === 'recordView') renderRecords();
+      if (tabId === 'scanView') startQRScanner();
+      if (tabId === 'adminView') renderAdminPanel();
+      if (tabId !== 'scanView' && html5QrcodeScanner) stopQRScanner();
+    }
+
+    // LOGIK TAB 1: REKOD KEHADIRAN (TINGKATAN 1 - 5, HADIR/TIDAK HADIR, ASPURA/ASPURI)
+    function renderRecords() {
+      const filterForm = document.getElementById('filterForm').value;
+      const container = document.getElementById('recordsContainer');
+      container.innerHTML = "";
+
+      const formsToDisplay = filterForm === "ALL" ? ["1", "2", "3", "4", "5"] : [filterForm];
+
+      formsToDisplay.forEach(formNum => {
+        const formStudents = students.filter(s => s.form == formNum);
+        
+        let html = `
+          <div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+            <div class="bg-emerald-800 text-white px-4 py-2.5 font-bold flex justify-between items-center">
+              <span><i class="fa-solid fa-graduation-cap mr-2"></i>TINGKATAN ${formNum}</span>
+              <span class="text-xs bg-emerald-900 px-2 py-1 rounded">Jumlah Pelajar: ${formStudents.length}</span>
+            </div>
+            <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        `;
+
+        // Pengasingan HADIR / TIDAK HADIR
+        // Pelajar dianggap TIDAK HADIR jika ada rekod keluar tanpa rekod masuk semula
+        const absentStudents = [];
+        const presentStudents = [];
+
+        formStudents.forEach(st => {
+          const stRecord = records.filter(r => r.studentIc === st.ic).slice(-1)[0];
+          if (stRecord && !stRecord.returned) {
+            absentStudents.push({ student: st, record: stRecord });
+          } else {
+            presentStudents.push(st);
+          }
+        });
+
+        // Kolum TIDAK HADIR (BERADA DI LUAR ASRAMA)
+        html += `
+          <div class="bg-red-50 p-3 rounded-lg border border-red-200">
+            <h5 class="font-bold text-red-700 text-sm mb-2 flex items-center justify-between">
+              <span><i class="fa-solid fa-user-xmark mr-1"></i> TIDAK HADIR / OUTING (${absentStudents.length})</span>
+            </h5>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+        `;
+
+        if (absentStudents.length === 0) {
+          html += `<p class="text-xs text-gray-500 italic">Semua pelajar wujud di asrama.</p>`;
+        } else {
+          absentStudents.forEach(item => {
+            html += `
+              <div class="bg-white p-2.5 rounded border border-red-200 text-xs shadow-sm">
+                <div class="font-bold text-gray-800">${item.student.name} (${item.student.gender})</div>
+                <div class="text-gray-600">Dorm: ${item.student.dorm} | KP: ${item.student.ic}</div>
+                <div class="mt-1 text-red-600 font-medium">Sebab: ${item.record.reason}</div>
+                <div class="text-gray-500 text-[10px] mt-1">
+                  Masa Tarikh: ${item.record.date} (${item.record.time})<br>
+                  Dicatat Oleh: <b>${item.record.warden}</b>
+                </div>
+              </div>
+            `;
+          });
+        }
+        html += `</div></div>`;
+
+        // Kolum HADIR (BERADA DI ASRAMA)
+        html += `
+          <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+            <h5 class="font-bold text-emerald-700 text-sm mb-2 flex items-center justify-between">
+              <span><i class="fa-solid fa-user-check mr-1"></i> HADIR DI ASRAMA (${presentStudents.length})</span>
+            </h5>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+        `;
+
+        if (presentStudents.length === 0) {
+          html += `<p class="text-xs text-gray-500 italic">Tiada pelajar terkini.</p>`;
+        } else {
+          presentStudents.forEach(st => {
+            html += `
+              <div class="bg-white p-2.5 rounded border border-emerald-200 text-xs shadow-sm flex justify-between items-center">
+                <div>
+                  <div class="font-bold text-gray-800">${st.name} <span class="text-[10px] text-gray-500">(${st.gender})</span></div>
+                  <div class="text-gray-500">Dorm: ${st.dorm} | KP: ${st.ic}</div>
+                </div>
+                <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">HADIR</span>
+              </div>
+            `;
+          });
+        }
+        html += `</div></div></div></div>`;
+
+        container.innerHTML += html;
+      });
+    }
+
+    // LOGIK TAB 2: IMBAS QR CODE (WARDEN)
+    function startQRScanner() {
+      if (html5QrcodeScanner) return;
+
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+
+    function stopQRScanner() {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(error => console.error(error));
+        html5QrcodeScanner = null;
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      // Semak data pelajar dari QR Code (Standard JSON atau No. KP)
+      let student = null;
+      try {
+        const parsed = JSON.parse(decodedText);
+        student = students.find(s => s.ic === parsed.ic);
+      } catch (e) {
+        student = students.find(s => s.ic === decodedText);
+      }
+
+      if (student) {
+        currentScannedStudent = student;
+        document.getElementById('scanNama').innerText = student.name;
+        document.getElementById('scanIc').innerText = student.ic;
+        document.getElementById('scanTingkatan').innerText = student.form;
+        document.getElementById('scanKategori').innerText = student.gender;
+        document.getElementById('scanDorm').innerText = student.dorm;
+
+        // Auto isi Masa, Tarikh, Warden
+        const now = new Date();
+        document.getElementById('scanDate').value = now.toLocaleDateString('ms-MY');
+        document.getElementById('scanTime').value = now.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('scanWarden').value = currentUser.name;
+
+        document.getElementById('scanResultForm').classList.remove('hidden');
+      } else {
+        alert("Pelajar tidak dijumpai dalam rekod sistem!");
+      }
+    }
+
+    function onScanFailure(error) {
+      // Biarkan senyap ketika mengimbas
+    }
+
+    function saveAttendanceRecord() {
+      if (!currentScannedStudent) return;
+
+      const reason = document.getElementById('scanReason').value;
+      const date = document.getElementById('scanDate').value;
+      const time = document.getElementById('scanTime').value;
+      const warden = document.getElementById('scanWarden').value;
+
+      const newRecord = {
+        id: Date.now(),
+        studentIc: currentScannedStudent.ic,
+        reason: reason,
+        date: date,
+        time: time,
+        warden: warden,
+        returned: false
+      };
+
+      records.push(newRecord);
+      localStorage.setItem('records', JSON.stringify(records));
+
+      alert("Rekod Kehadiran Berjaya Disimpan!");
+      document.getElementById('scanResultForm').classList.add('hidden');
+      currentScannedStudent = null;
+      switchTab('recordView');
+    }
+
+    // LOGIK TAB 3: PANEL ADMIN (PEMBINAAN AKAUN GURU, PELAJAR & KAD QR CODE)
+    function renderAdminPanel() {
+      renderTeacherListAdmin();
+      renderStudentListAdmin();
+    }
+
+    function addTeacher(e) {
+      e.preventDefault();
+      const name = document.getElementById('tName').value.trim();
+      const ic = document.getElementById('tIc').value.trim();
+      const pass = document.getElementById('tPass').value.trim();
+
+      if (teachers.some(t => t.ic === ic)) {
+        alert("Akaun Guru dengan No. KP ini telah wujud!");
+        return;
+      }
+
+      teachers.push({ name, ic, pass });
+      localStorage.setItem('teachers', JSON.stringify(teachers));
+      alert("Akaun Guru Berjaya Ditambah!");
+      document.getElementById('tName').value = "";
+      document.getElementById('tIc').value = "";
+      document.getElementById('tPass').value = "";
+      renderTeacherListAdmin();
+    }
+
+    function addStudent(e) {
+      e.preventDefault();
+      const name = document.getElementById('sName').value.trim();
+      const ic = document.getElementById('sIc').value.trim();
+      const form = document.getElementById('sForm').value;
+      const gender = document.getElementById('sGender').value;
+      const dorm = document.getElementById('sDorm').value.trim();
+
+      if (students.some(s => s.ic === ic)) {
+        alert("Pelajar dengan No. KP ini telah wujud!");
+        return;
+      }
+
+      const newStudent = { name, ic, form, gender, dorm };
+      students.push(newStudent);
+      localStorage.setItem('students', JSON.stringify(students));
+
+      // Penjanaan Kad QR Code
+      generateCard(newStudent);
+      renderStudentListAdmin();
+    }
+
+    function generateCard(student) {
+      document.getElementById('cardName').innerText = student.name;
+      document.getElementById('cardIc').innerText = student.ic;
+      document.getElementById('cardForm').innerText = student.form;
+      document.getElementById('cardGender').innerText = student.gender;
+      document.getElementById('cardDorm').innerText = student.dorm;
+
+      document.getElementById('qrcode').innerHTML = "";
+      new QRCode(document.getElementById("qrcode"), {
+        text: JSON.stringify({ ic: student.ic, name: student.name }),
+        width: 120,
+        height: 120
+      });
+
+      document.getElementById('cardPreviewSection').classList.remove('hidden');
+    }
+
+    function renderTeacherListAdmin() {
+      const tbody = document.getElementById('teacherTableBody');
+      tbody.innerHTML = "";
+      teachers.forEach((t, index) => {
+        tbody.innerHTML += `
+          <tr class="border-b">
+            <td class="p-2">${t.name}</td>
+            <td class="p-2">${t.ic}</td>
+            <td class="p-2 text-center">
+              <button onclick="deleteTeacher(${index})" class="text-red-500 hover:text-red-700">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function renderStudentListAdmin() {
+      const tbody = document.getElementById('studentTableBody');
+      const filterGender = document.getElementById('adminGenderFilter').value;
+      tbody.innerHTML = "";
+
+      const filtered = students.filter(s => filterGender === "ALL" || s.gender === filterGender);
+
+      filtered.forEach((s, index) => {
+        tbody.innerHTML += `
+          <tr class="border-b">
+            <td class="p-2">${s.name}</td>
+            <td class="p-2">${s.form}</td>
+            <td class="p-2">${s.gender}</td>
+            <td class="p-2 text-center">
+              <button onclick="deleteStudent('${s.ic}')" class="text-red-500 hover:text-red-700">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function deleteTeacher(index) {
+      if (confirm("Adakah anda pasti mahu menghapus akaun guru ini?")) {
+        teachers.splice(index, 1);
+        localStorage.setItem('teachers', JSON.stringify(teachers));
+        renderTeacherListAdmin();
+      }
+    }
+
+    function deleteStudent(ic) {
+      if (confirm("Adakah anda pasti mahu menghapus rekod pelajar ini?")) {
+        students = students.filter(s => s.ic !== ic);
+        localStorage.setItem('students', JSON.stringify(students));
+        renderStudentListAdmin();
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      stopQRScanner();
+      document.getElementById('dashboardScreen').classList.add('hidden');
+      document.getElementById('userInfo').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('loginIc').value = "";
+      document.getElementById('loginPassword').value = "";
+    }
+  </script>
+</body>
+</html>
